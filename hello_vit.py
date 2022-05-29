@@ -5,6 +5,8 @@
 
 
 from timm.models.layers.helpers import to_2tuple
+from timm.models.layers.weight_init import lecun_normal_, trunc_normal_
+from timm.models.vision_transformer import _init_vit_weights
 import torch.nn as nn
 import torch 
 from modelsummary import summary
@@ -102,9 +104,9 @@ class Block(nn.Module):
         return x
 
 
-class VisionTransformer(nn.Module):
+class SimpleVisionTransformer(nn.Module):
     def __init__(self, img_size=224, patch_size = 16, in_chans=3, num_classes=10, embed_dim=768, depth=6, \
-            num_heads=4, mlp_ratio =2, qkv_bias=False, drop_rate=0., attn_drop_rate=0., norm_layer=nn.LayerNorm) -> None:
+            num_heads=6, mlp_ratio =3, qkv_bias=False, drop_rate=0., attn_drop_rate=0., norm_layer=nn.LayerNorm) -> None:
         super().__init__()
         self.num_classes = num_classes
         self.num_features = self.embed_dim = embed_dim
@@ -122,6 +124,14 @@ class VisionTransformer(nn.Module):
         self.norm = norm_layer(embed_dim)
         # Classifier head
         self.class_head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+        self._init_weights()
+    
+    def _init_weights(self): 
+        trunc_normal_(self.pos_embed, std=.02) 
+        trunc_normal_(self.cls_token, std=.02)
+        self.apply(_init_vit_weights)
+
+
 
     def Forward_features(self, x):
         B = x.shape[0]
@@ -140,14 +150,17 @@ class VisionTransformer(nn.Module):
         x = self.Forward_features(x)
         x = self.class_head(x) 
         return x 
+    
+    
+
 
 if __name__ == '__main__':
     
     #print(ViT)
-    ViT = VisionTransformer(img_size=32, patch_size=4, embed_dim=48) 
+    ViT = SimpleVisionTransformer(img_size=32, patch_size=4, embed_dim=48) 
     x = torch.rand(10,3, 32,32)
     y = ViT(x)
     print('Input shape = x', x.shape)
     print('output shape = y',y.shape)
 
-    summary(ViT, x, show_hierarchical=True)
+    summary(ViT, x, )

@@ -1,6 +1,7 @@
 from lib2to3.pgen2 import pgen
 import os
 from pickletools import optimize
+from sklearn.model_selection import learning_curve
 import torch
 from torch import nn, normal
 import torch.nn.functional as F
@@ -12,7 +13,9 @@ from torch import optim, nn, utils, Tensor
 import pytorch_lightning as pl
 from argparse import ArgumentParser
 
-from hello_vit import VisionTransformer 
+from hello_vit import SimpleVisionTransformer 
+from hello_resnet import SimpleResNet
+
 
 
 class lighteningModel(pl.LightningModule):
@@ -109,20 +112,27 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', type=int, default=4)
     
     parser.add_argument('--learning_rate', type=float, default=1e-3)
+    
+    parser.add_argument('--model_arch', type=str, choices=['resnet', 'vit'], default='resnet')
     parser = pl.Trainer.add_argparse_args(parser)
 
     args = parser.parse_args()
 
     
     trainloader, testloader, classes  = get_datasets(batch_size=args.batch_size, num_workers=args.num_workers, normalize=True)
-    ViT = VisionTransformer(img_size=32, patch_size=4, embed_dim=48) 
-    ViT_pl = lighteningModel(ViT, learning_rate=args.learning_rate)
-
-
+    
+    if args.model_arch.lower() =='vit': 
+        model = SimpleVisionTransformer(img_size=32, patch_size=4, embed_dim=48) 
+        model_pl = lighteningModel(model, learning_rate=args.learning_rate)
+        print('Trainng Simple VIT model')
+    elif args.model_arch.lower() =='resnet':
+        model  = SimpleResNet(layers=[1,1,1,1], num_classes=10, inplanes=12, zero_init_residual=True, aggressive_downsampling=False)
+        model_pl = lighteningModel(model, learning_rate=args.learning_rate)
+        print('Training Simple ResNet model')
     trainer = pl.Trainer.from_argparse_args(args)
 
-    trainer.fit(ViT_pl,train_dataloaders=trainloader, val_dataloaders=testloader)
+    trainer.fit(model_pl,train_dataloaders=trainloader, val_dataloaders=testloader)
 
 
     # save the model that is trained 
-    trainer.save_checkpoint("final.ckpt")
+    trainer.save_checkpoint(f"{args.model_arch.lower()}_final.ckpt")
